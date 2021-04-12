@@ -23,19 +23,6 @@ data
 
 
 <div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -173,23 +160,22 @@ for col in cols:
         tmp = {}
         for label in labels:
             filter2 = data[label_col]==label
-            p_label_col = data.where(filter1 & filter2).groupby([col,label_col], as_index=True)[col].count().sum()/p_label[label]
+            p_label_col = (data.where(filter1 & filter2).groupby([col,label_col], as_index=True)[col].count().sum()+1)/(p_label[label]+len(labels))
             tmp[label] = p_label_col*p_label[label]
-#             print('evade:',label,' refund:',uq_value,' = ',tmp[label])
         posterior[col][uq_value] = tmp
 pprint(posterior, width=10)
 ```
 
-    {'marital_status': {'divorced': {'no': 1.0,
-                                     'yes': 1.0},
-                        'married': {'no': 4.0,
-                                    'yes': 0.0},
-                        'single': {'no': 2.0,
-                                   'yes': 2.0}},
-     'refund': {'no': {'no': 4.0,
-                       'yes': 3.0},
-                'yes': {'no': 3.0,
-                        'yes': 0.0}}}
+    {'marital_status': {'divorced': {'no': 1.5555555555555554,
+                                     'yes': 1.2000000000000002},
+                        'married': {'no': 3.8888888888888893,
+                                    'yes': 0.6000000000000001},
+                        'single': {'no': 2.333333333333333,
+                                   'yes': 1.7999999999999998}},
+     'refund': {'no': {'no': 3.8888888888888893,
+                       'yes': 2.4000000000000004},
+                'yes': {'no': 3.1111111111111107,
+                        'yes': 0.6000000000000001}}}
 
 
 
@@ -206,16 +192,16 @@ for uq_value in uq_values:
 pprint(posterior, width=10)
 ```
 
-    {'marital_status': {'divorced': {'no': 1.0,
-                                     'yes': 1.0},
-                        'married': {'no': 4.0,
-                                    'yes': 0.0},
-                        'single': {'no': 2.0,
-                                   'yes': 2.0}},
-     'refund': {'no': {'no': 4.0,
-                       'yes': 3.0},
-                'yes': {'no': 3.0,
-                        'yes': 0.0}},
+    {'marital_status': {'divorced': {'no': 1.5555555555555554,
+                                     'yes': 1.2000000000000002},
+                        'married': {'no': 3.8888888888888893,
+                                    'yes': 0.6000000000000001},
+                        'single': {'no': 2.333333333333333,
+                                   'yes': 1.7999999999999998}},
+     'refund': {'no': {'no': 3.8888888888888893,
+                       'yes': 2.4000000000000004},
+                'yes': {'no': 3.1111111111111107,
+                        'yes': 0.6000000000000001}},
      'taxable_income': {60: {'no': 0.004804961450304905,
                              'yes': 1.2151765699646583e-09},
                         70: {'no': 0.005589610036170942,
@@ -236,6 +222,73 @@ pprint(posterior, width=10)
                               'yes': 1.826944081672921e-12},
                         220: {'no': 0.0009571488527694265,
                               'yes': 1.2894519942795936e-148}}}
+
+
+
+```python
+predict_class = []
+cols = list(data.columns[:-1])
+for i in range(len(data)):
+    predict={}
+    for label in labels:
+        predict[label] = 1
+        for col in cols:
+            predict[label] *= posterior[col][data[col].iloc[i]][label]
+        predict[label] *= p_label[label]
+    predict_class.append(sorted(predict, key=predict.get, reverse=True)[0])
+predict_class
+```
+
+
+
+
+    ['no', 'no', 'no', 'no', 'yes', 'no', 'no', 'yes', 'no', 'yes']
+
+
+
+
+```python
+actual_class = data['evade'].to_list()
+cross_tab = []
+for i in range(len(actual_class)):
+    if actual_class[i]==predict_class[i] and actual_class[i]=='yes':
+        cross_tab.append('TP')
+    elif actual_class[i]==predict_class[i] and actual_class[i]=='no':
+        cross_tab.append('TN')
+    elif actual_class[i]!=predict_class[i] and actual_class[i]=='yes':
+        cross_tab.append('FP')
+    elif actual_class[i]!=predict_class[i] and actual_class[i]=='no':
+        cross_tab.append('FN')
+        
+print(cross_tab)
+```
+
+    ['TN', 'TN', 'TN', 'TN', 'TP', 'TN', 'TN', 'TP', 'TN', 'TP']
+
+
+
+```python
+regions = ['TP','TN','FP','FN']
+result = {}
+for region in regions:
+    result[region] = cross_tab.count(region)
+result
+```
+
+
+
+
+    {'TP': 3, 'TN': 7, 'FP': 0, 'FN': 0}
+
+
+
+
+```python
+accuracy = (result['TP']+result['TN'])/len(data)*100
+print('accuracy: ', accuracy,'%')
+```
+
+    accuracy:  100.0 %
 
 
 
